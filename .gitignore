@@ -1,0 +1,23 @@
+# 秘密情報・環境設定（絶対にGitにコミットしてはいけないファイル）
+.env
+.env.local
+.env.*.local
+src/.env
+src/.env.backup
+
+# Laravelのキャッシュ・一時ファイル（自動生成されるため不要）
+src/vendor/
+src/node_modules/
+src/bootstrap/cache/*.php
+src/storage/logs/
+src/storage/framework/cache/
+src/storage/framework/sessions/
+src/storage/framework/views/
+
+# macOSのシステムファイル
+.DS_Store
+
+# IDEの設定ファイル
+.idea/
+.vscode/
+*.swp

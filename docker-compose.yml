@@ -1,0 +1,65 @@
+services:
+
+  # Laravelアプリケーション本体
+  app:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: lurex_app
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html          # Mac側のsrc/フォルダとコンテナを同期
+    ports:
+      - "8000:8000"                  # ブラウザから http://localhost:8000 でアクセス
+    environment:
+      - APP_ENV=local
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-lurex}
+      - DB_USERNAME=${DB_USERNAME:-lurex}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+    depends_on:
+      db:
+        condition: service_healthy   # DBが起動完了してからappを起動
+    networks:
+      - lurex_network
+
+  # MySQLデータベース
+  db:
+    image: mysql:8.0
+    container_name: lurex_db
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-lurex}
+      MYSQL_USER: ${DB_USERNAME:-lurex}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+    volumes:
+      - lurex_db_data:/var/lib/mysql  # DBデータを永続化（コンテナ削除後もデータが残る）
+    ports:
+      - "3306:3306"                   # MySQLに直接接続したい場合用
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lurex_network
+
+  # メール確認ツール（開発中に送信されるメールをブラウザで確認できる）
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: lurex_mailpit
+    ports:
+      - "8025:8025"   # ブラウザから http://localhost:8025 でメール確認
+      - "1025:1025"   # SMTPポート（LaravelからのメールはここへルーティングされMacに届かない）
+    networks:
+      - lurex_network
+
+networks:
+  lurex_network:
+    driver: bridge
+
+volumes:
+  lurex_db_data:   # DBデータの永続化ボリューム
