@@ -28,6 +28,14 @@
 | **Git + GitHub（privateリポジトリ）** | コードの安全な管理 |
 | **さくらのレンタルサーバ（スタンダードプラン以上）** | SSHアクセスが必要なため |
 
+### Git/GitHub
+| 項目 | 内容 |
+|---|---|
+| リポジトリ | github.com/Takuya1227/lure-flea-market（private） |
+| 使用アカウント | Takuya1227（個人）/ bnx-otsuka（仕事・デフォルト） |
+| 認証方式 | SSH鍵（~/.ssh/id_ed25519_takuya1227）でアカウント使い分け |
+| SSH Host設定 | `github-takuya` → Takuya1227用、`github.com` → bnx-otsuka用 |
+
 ### 開発環境
 | ツール | 採用理由 |
 |---|---|
