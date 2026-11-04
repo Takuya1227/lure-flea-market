@@ -20,14 +20,14 @@
                 </div>
             @endif
 
-            {{-- ステータスバナー --}}
+            {{-- ステータスバナー（非公開の場合） --}}
             @if ($lure->status !== 'active')
                 <div class="p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg text-sm text-center">
                     この商品は現在「{{ $lure->statusLabel }}」です
                 </div>
             @endif
 
-            {{-- 画像ギャラリー --}}
+            {{-- ===== 画像ギャラリー ===== --}}
             <div class="bg-white shadow rounded-lg overflow-hidden">
                 @if ($lure->images->isNotEmpty())
                     @php $imageCount = $lure->images->count(); @endphp
@@ -51,18 +51,16 @@
                                 }
                             },
                         }">
-                        {{-- メイン画像（スワイプ対応） --}}
+                        {{-- メイン画像 --}}
                         <div class="relative bg-gray-100 h-72 sm:h-96 flex items-center justify-center overflow-hidden select-none"
                              @touchstart.passive="swipeStart($event)"
                              @touchend.passive="swipeEnd($event)">
-
                             @foreach ($lure->images as $i => $image)
                                 <img src="{{ $image->url }}" alt="画像{{ $i + 1 }}"
                                      x-show="active === {{ $i }}"
                                      class="max-w-full max-h-full object-contain pointer-events-none">
                             @endforeach
 
-                            {{-- 左右の矢印ボタン（複数枚のみ表示・PCで操作しやすいよう常時表示） --}}
                             @if ($imageCount > 1)
                                 <button @click="prev" x-show="active > 0"
                                         class="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-9 h-9 flex items-center justify-center transition">
@@ -72,20 +70,17 @@
                                         class="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-9 h-9 flex items-center justify-center transition">
                                     &#8250;
                                 </button>
-
-                                {{-- ドットインジケーター（現在位置をわかりやすく） --}}
                                 <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
                                     @foreach ($lure->images as $i => $image)
                                         <button @click="active = {{ $i }}"
                                                 :class="active === {{ $i }} ? 'bg-white' : 'bg-white bg-opacity-50'"
-                                                class="w-2 h-2 rounded-full transition">
-                                        </button>
+                                                class="w-2 h-2 rounded-full transition"></button>
                                     @endforeach
                                 </div>
                             @endif
                         </div>
 
-                        {{-- サムネイル行（PC向け） --}}
+                        {{-- サムネイル行（PC） --}}
                         @if ($imageCount > 1)
                             <div class="hidden sm:flex gap-2 p-3 overflow-x-auto">
                                 @foreach ($lure->images as $i => $image)
@@ -105,14 +100,17 @@
                 @endif
             </div>
 
-            {{-- 基本情報 --}}
+            {{-- ===== 基本情報 + 購入/いいねボタン ===== --}}
             <div class="bg-white shadow rounded-lg p-6">
                 <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <div class="flex items-center gap-2 text-sm text-gray-500">
-                            <span>{{ $lure->categoryLabel }}</span>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
+                            <span class="inline-block px-2 py-0.5 bg-gray-100 rounded text-xs">{{ $lure->categoryLabel }}</span>
                             @if ($lure->lure_type)
-                                <span>・{{ $lure->lure_type }}</span>
+                                <span>{{ $lure->lure_type }}</span>
+                            @endif
+                            @if ($lure->is_handmade)
+                                <span class="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">ハンドメイド</span>
                             @endif
                         </div>
                         <h1 class="text-2xl font-bold text-gray-900 mt-1">{{ $lure->model_name }}</h1>
@@ -137,9 +135,68 @@
                         <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ $lure->description }}</p>
                     </div>
                 @endif
+
+                {{-- 購入 / いいねボタン --}}
+                @if ($lure->status === 'active')
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex gap-3">
+                        @can('update', $lure)
+                            {{-- 自分の商品には購入ボタンを表示しない --}}
+                        @else
+                            {{-- 購入ボタン（フェーズ5で実装） --}}
+                            @auth
+                                <button disabled
+                                        class="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl opacity-60 cursor-not-allowed text-sm">
+                                    購入する（近日公開）
+                                </button>
+                            @else
+                                <a href="{{ route('login') }}"
+                                   class="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition text-sm text-center">
+                                    ログインして購入
+                                </a>
+                            @endauth
+                        @endcan
+
+                        {{-- いいねボタン --}}
+                        <div x-data="{
+                            favorited: {{ $isFavorited ? 'true' : 'false' }},
+                            count: {{ $lure->favorites_count }},
+                            isLoggedIn: {{ auth()->check() ? 'true' : 'false' }},
+                            async toggle() {
+                                if (!this.isLoggedIn) {
+                                    window.location.href = '{{ route('login') }}';
+                                    return;
+                                }
+                                const res = await fetch('{{ route('lures.favorite.toggle', $lure) }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                        'Accept': 'application/json',
+                                    }
+                                });
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    this.favorited = data.favorited;
+                                    this.count = data.count;
+                                }
+                            }
+                        }">
+                            <button @click="toggle"
+                                    class="flex items-center gap-2 px-5 py-3 rounded-xl border-2 font-medium text-sm transition"
+                                    :class="favorited ? 'border-red-400 text-red-500 bg-red-50' : 'border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-400'">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5"
+                                     :fill="favorited ? 'currentColor' : 'none'"
+                                     viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                </svg>
+                                <span x-text="count"></span>
+                            </button>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            {{-- スペック詳細 --}}
+            {{-- ===== スペック詳細 ===== --}}
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="font-medium text-gray-900 mb-4">商品詳細</h3>
                 <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -199,12 +256,35 @@
                 </dl>
             </div>
 
-            {{-- 出品者アクション --}}
+            {{-- ===== 出品者情報 ===== --}}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="font-medium text-gray-900 mb-4">出品者</h3>
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                        @if ($lure->seller?->profile_image_path)
+                            <img src="{{ Storage::disk('public')->url($lure->seller->profile_image_path) }}"
+                                 alt="{{ $lure->seller->displayName }}"
+                                 class="w-full h-full object-cover">
+                        @else
+                            <div class="w-full h-full flex items-center justify-center text-gray-400 text-lg font-bold">
+                                {{ mb_substr($lure->seller?->displayName ?? '?', 0, 1) }}
+                            </div>
+                        @endif
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-900">{{ $lure->seller?->displayName ?? '退会済みユーザー' }}</p>
+                        @if ($lure->seller?->bio)
+                            <p class="text-sm text-gray-500 mt-0.5 line-clamp-2">{{ $lure->seller->bio }}</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            {{-- ===== 出品者アクション ===== --}}
             @can('update', $lure)
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
                     <h3 class="font-medium text-gray-900">出品者メニュー</h3>
 
-                    {{-- 値下げフォーム --}}
                     @if ($lure->isActive())
                         <form method="POST" action="{{ route('lures.mark-down', $lure) }}"
                               x-data="{ open: false }">
@@ -225,7 +305,6 @@
                         </form>
                     @endif
 
-                    {{-- 一時停止 / 再開 --}}
                     @if ($lure->status === 'active')
                         <form method="POST" action="{{ route('lures.suspend', $lure) }}">
                             @csrf @method('PATCH')
@@ -243,6 +322,24 @@
                     @endif
                 </div>
             @endcan
+
+            {{-- ===== 関連商品 ===== --}}
+            @if ($similarLures->isNotEmpty())
+                <div>
+                    <h3 class="font-medium text-gray-900 mb-4">同じカテゴリの商品</h3>
+                    @php
+                        $userFavoriteIds = auth()->check()
+                            ? \App\Models\Favorite::where('user_id', auth()->id())
+                                ->pluck('lure_id')->toArray()
+                            : [];
+                    @endphp
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        @foreach ($similarLures as $lure)
+                            @include('partials.lure-card', ['lure' => $lure, 'userFavoriteIds' => $userFavoriteIds])
+                        @endforeach
+                    </div>
+                </div>
+            @endif
 
         </div>
     </div>

@@ -52,6 +52,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Lure::class, 'seller_id');
     }
 
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(\App\Models\Favorite::class);
+    }
+
     // 表示名：ニックネームがあればそちらを優先
     public function getDisplayNameAttribute(): string
     {

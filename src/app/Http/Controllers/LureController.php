@@ -6,6 +6,7 @@ use App\Http\Requests\StoreLureRequest;
 use App\Http\Requests\UpdateLureRequest;
 use App\Models\Brand;
 use App\Models\Color;
+use App\Models\Favorite;
 use App\Models\Lure;
 use App\Models\LureImage;
 use Illuminate\Http\RedirectResponse;
@@ -70,8 +71,23 @@ class LureController extends Controller
         abort_if($lure->status === 'deleted', 404);
 
         $lure->load(['seller', 'brand', 'color', 'images']);
+        $lure->loadCount('favorites');
 
-        return view('lures.show', compact('lure'));
+        $isFavorited = auth()->check()
+            ? Favorite::where('user_id', auth()->id())->where('lure_id', $lure->id)->exists()
+            : false;
+
+        // 同カテゴリの関連商品（自分以外・出品中・最大4件）
+        $similarLures = Lure::active()
+            ->where('category', $lure->category)
+            ->where('id', '!=', $lure->id)
+            ->with(['images' => fn ($q) => $q->where('display_order', 0)])
+            ->withCount('favorites')
+            ->latest()
+            ->limit(4)
+            ->get();
+
+        return view('lures.show', compact('lure', 'isFavorited', 'similarLures'));
     }
 
     // 編集フォーム

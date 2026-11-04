@@ -10,7 +10,7 @@ class Brand extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'name_kana', 'is_active'];
+    protected $fillable = ['name', 'name_en', 'name_kana', 'is_active'];
 
     protected function casts(): array
     {
