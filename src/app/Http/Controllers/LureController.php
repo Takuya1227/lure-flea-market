@@ -9,6 +9,7 @@ use App\Models\Color;
 use App\Models\Favorite;
 use App\Models\Lure;
 use App\Models\LureImage;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,36 @@ class LureController extends Controller
         return view('lures.create', compact('brands', 'colors', 'prefectures'));
     }
 
+    // 画像一時アップロード（選択時にAJAXで呼ばれる）
+    public function storeTempImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $path = $request->file('image')->store('temp/lures', 'public');
+
+        return response()->json([
+            'path' => $path,
+            'url'  => Storage::disk('public')->url($path),
+        ]);
+    }
+
+    // 動画一時アップロード
+    public function storeTempVideo(Request $request): JsonResponse
+    {
+        $request->validate([
+            'video' => ['required', 'file', 'mimetypes:video/mp4,video/quicktime,video/webm', 'max:102400'],
+        ]);
+
+        $path = $request->file('video')->store('temp/lures/videos', 'public');
+
+        return response()->json([
+            'path' => $path,
+            'url'  => Storage::disk('public')->url($path),
+        ]);
+    }
+
     // 出品保存（新規）
     public function store(StoreLureRequest $request): RedirectResponse
     {
@@ -50,7 +81,8 @@ class LureController extends Controller
                 ['seller_id' => $request->user()->id, 'status' => $status]
             ));
 
-            $this->storeImages($request, $lure);
+            $this->moveTempImages($request, $lure);
+            $this->moveTempVideo($request, $lure);
 
             return $lure;
         });
@@ -139,6 +171,7 @@ class LureController extends Controller
 
             // 3. 新規画像を末尾に追加（削除・並び替え後の枚数を起点にする）
             $this->storeImages($request, $lure);
+            $this->moveTempVideo($request, $lure);
         });
 
         $message = $isDraft ? '下書きを更新しました。' : '商品情報を更新しました。';
@@ -199,7 +232,7 @@ class LureController extends Controller
 
     private function buildLureData(StoreLureRequest|UpdateLureRequest $request): array
     {
-        return $request->safe()->except(['images', 'form_action', 'delete_image_ids']) + [
+        return $request->safe()->except(['images', 'form_action', 'delete_image_ids', 'temp_video_path', 'temp_image_paths']) + [
             'is_handmade'     => $request->boolean('is_handmade'),
             'is_discontinued' => $request->boolean('is_discontinued'),
             'is_limited'      => $request->boolean('is_limited'),
@@ -226,6 +259,49 @@ class LureController extends Controller
                 'lure_id'       => $lure->id,
                 'image_path'    => $path,
                 'display_order' => $currentCount + $index,
+            ]);
+        }
+    }
+
+    private function moveTempVideo(StoreLureRequest|UpdateLureRequest $request, Lure $lure): void
+    {
+        $tempPath = $request->input('temp_video_path');
+        if (!$tempPath) {
+            return;
+        }
+
+        // パストラバーサル防止
+        if (!preg_match('/^temp\/lures\/videos\/[a-zA-Z0-9_\-]+\.(mp4|mov|webm)$/i', $tempPath)) {
+            return;
+        }
+
+        if (!Storage::disk('public')->exists($tempPath)) {
+            return;
+        }
+
+        // 既存動画があれば削除
+        if ($lure->video_path && Storage::disk('public')->exists($lure->video_path)) {
+            Storage::disk('public')->delete($lure->video_path);
+        }
+
+        $newPath = 'lures/videos/' . basename($tempPath);
+        Storage::disk('public')->move($tempPath, $newPath);
+        $lure->update(['video_path' => $newPath]);
+    }
+
+    // 一時アップロード済み画像を本番ディレクトリへ移動（新規出品時）
+    private function moveTempImages(StoreLureRequest $request, Lure $lure): void
+    {
+        $tempPaths = array_filter((array) $request->input('temp_image_paths', []));
+
+        foreach (array_values(array_slice($tempPaths, 0, 10)) as $index => $tempPath) {
+            $newPath = 'lures/' . basename($tempPath);
+            Storage::disk('public')->move($tempPath, $newPath);
+
+            LureImage::create([
+                'lure_id'       => $lure->id,
+                'image_path'    => $newPath,
+                'display_order' => $index,
             ]);
         }
     }

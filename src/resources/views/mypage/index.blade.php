@@ -53,7 +53,7 @@
                 </div>
 
                 {{-- 統計バー --}}
-                <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-3 gap-4 text-center">
+                <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                     <div>
                         <p class="text-2xl font-bold text-gray-900">{{ $user->sales_count }}</p>
                         <p class="text-xs text-gray-500 mt-0.5">販売実績</p>
@@ -65,6 +65,10 @@
                     <div>
                         <p class="text-2xl font-bold text-gray-900">{{ $activeLures->count() }}</p>
                         <p class="text-xs text-gray-500 mt-0.5">出品中</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900">{{ $activeTransactionCount }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">取引中</p>
                     </div>
                 </div>
             </div>
@@ -125,15 +129,83 @@
                 @endif
             </div>
 
+            {{-- 販売履歴 --}}
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h4 class="font-medium text-gray-900">販売履歴</h4>
+                    <span class="text-xs text-gray-400">直近5件</span>
+                </div>
+                @if ($salesHistory->isEmpty())
+                    <div class="p-8 text-center text-gray-400">
+                        <p class="text-sm">販売履歴はありません</p>
+                    </div>
+                @else
+                    <div class="divide-y divide-gray-100">
+                        @foreach ($salesHistory as $tx)
+                            <div class="px-6 py-3 flex items-center gap-3">
+                                <div class="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                                    @if ($tx->lure->images->isNotEmpty())
+                                        <img src="{{ $tx->lure->images->first()->url }}" class="w-full h-full object-cover">
+                                    @endif
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">{{ $tx->lure->model_name }}</p>
+                                    <p class="text-xs text-gray-500">¥{{ number_format($tx->price) }}</p>
+                                </div>
+                                <span @class([
+                                    'inline-block px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0',
+                                    'bg-blue-100 text-blue-700'     => $tx->status === 'paid',
+                                    'bg-indigo-100 text-indigo-700' => $tx->status === 'shipped',
+                                    'bg-purple-100 text-purple-700' => $tx->status === 'review_pending',
+                                    'bg-green-100 text-green-700'   => $tx->status === 'completed',
+                                    'bg-gray-100 text-gray-500'     => $tx->status === 'cancelled',
+                                ])>{{ $tx->statusLabel }}</span>
+                                <a href="{{ route('transactions.show', $tx) }}"
+                                   class="text-xs text-indigo-600 hover:underline flex-shrink-0">詳細</a>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
             {{-- 購入履歴 --}}
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h4 class="font-medium text-gray-900">購入履歴</h4>
-                    <span class="text-xs text-gray-400">（購入機能は準備中です）</span>
+                    <span class="text-xs text-gray-400">直近5件</span>
                 </div>
-                <div class="p-8 text-center text-gray-400">
-                    <p class="text-sm">購入履歴はありません</p>
-                </div>
+                @if ($purchaseHistory->isEmpty())
+                    <div class="p-8 text-center text-gray-400">
+                        <p class="text-sm">購入履歴はありません</p>
+                    </div>
+                @else
+                    <div class="divide-y divide-gray-100">
+                        @foreach ($purchaseHistory as $tx)
+                            <div class="px-6 py-3 flex items-center gap-3">
+                                <div class="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                                    @if ($tx->lure->images->isNotEmpty())
+                                        <img src="{{ $tx->lure->images->first()->url }}" class="w-full h-full object-cover">
+                                    @endif
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">{{ $tx->lure->model_name }}</p>
+                                    <p class="text-xs text-gray-500">¥{{ number_format($tx->price) }}</p>
+                                </div>
+                                <span @class([
+                                    'inline-block px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0',
+                                    'bg-yellow-100 text-yellow-700' => $tx->status === 'pending_payment',
+                                    'bg-blue-100 text-blue-700'     => $tx->status === 'paid',
+                                    'bg-indigo-100 text-indigo-700' => $tx->status === 'shipped',
+                                    'bg-purple-100 text-purple-700' => $tx->status === 'review_pending',
+                                    'bg-green-100 text-green-700'   => $tx->status === 'completed',
+                                    'bg-gray-100 text-gray-500'     => $tx->status === 'cancelled',
+                                ])>{{ $tx->statusLabel }}</span>
+                                <a href="{{ route('transactions.show', $tx) }}"
+                                   class="text-xs text-indigo-600 hover:underline flex-shrink-0">詳細</a>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             {{-- 受けたレビュー --}}
@@ -158,10 +230,10 @@
                        class="flex items-center gap-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm text-gray-700 transition">
                         配送先住所
                     </a>
-                    {{-- フェーズ5で振込申請ページに差し替え --}}
-                    <span class="flex items-center gap-2 p-3 rounded-lg border border-gray-100 text-sm text-gray-300 cursor-not-allowed">
-                        振込申請（準備中）
-                    </span>
+                    <a href="{{ route('withdrawals.index') }}"
+                       class="flex items-center gap-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm text-gray-700 transition">
+                        振込申請
+                    </a>
                 </div>
             </div>
 

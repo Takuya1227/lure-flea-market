@@ -83,13 +83,15 @@ class LureTest extends TestCase
 
         $user = User::factory()->create();
 
-        // GDのJPEGサポートが無い環境でも動作するようPNGを使用
-        $response = $this->actingAs($user)->post(route('lures.store'), array_merge(
+        // AJAXプリアップロード方式: temp/ に事前保存したパスを渡す
+        $path1 = 'temp/lures/abc123.png';
+        $path2 = 'temp/lures/def456.png';
+        Storage::disk('public')->put($path1, 'fake-image-content');
+        Storage::disk('public')->put($path2, 'fake-image-content');
+
+        $this->actingAs($user)->post(route('lures.store'), array_merge(
             $this->validLureData(),
-            ['images' => [
-                UploadedFile::fake()->image('lure1.png', 100, 100),
-                UploadedFile::fake()->image('lure2.png', 100, 100),
-            ]]
+            ['temp_image_paths' => [$path1, $path2]]
         ));
 
         $lure = Lure::where('seller_id', $user->id)->first();
@@ -105,16 +107,14 @@ class LureTest extends TestCase
 
         $user = User::factory()->create();
 
-        // text/plainのMIMEタイプを持つファイルは画像バリデーションで弾かれる
+        // 画像バリデーションはAJAXプリアップロード（storeTempImage）で行う
         $fakeText = UploadedFile::fake()->create('document.txt', 100, 'text/plain');
 
-        $response = $this->actingAs($user)->post(route('lures.store'), array_merge(
-            $this->validLureData(),
-            ['images' => [$fakeText]]
-        ));
+        $response = $this->actingAs($user)->postJson(route('lures.images.temp'), [
+            'image' => $fakeText,
+        ]);
 
-        // バリデーションエラーになること（imageルールが弾く）
-        $response->assertSessionHasErrors('images.0');
+        $response->assertStatus(422);
     }
 
     public function test_php_file_disguised_as_image_is_rejected(): void
@@ -123,15 +123,14 @@ class LureTest extends TestCase
 
         $user = User::factory()->create();
 
-        // application/x-php MIMEタイプのファイルは弾かれる
+        // application/x-php MIMEタイプのファイルはmimes:jpeg,png,webpで弾かれる
         $fakePhp = UploadedFile::fake()->create('shell.php', 100, 'application/x-php');
 
-        $response = $this->actingAs($user)->post(route('lures.store'), array_merge(
-            $this->validLureData(),
-            ['images' => [$fakePhp]]
-        ));
+        $response = $this->actingAs($user)->postJson(route('lures.images.temp'), [
+            'image' => $fakePhp,
+        ]);
 
-        $response->assertSessionHasErrors('images.0');
+        $response->assertStatus(422);
     }
 
     // ---- 認可テスト ----

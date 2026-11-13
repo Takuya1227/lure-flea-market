@@ -54,7 +54,7 @@
                             <x-dropdown-link :href="route('profile.edit')">プロフィール設定</x-dropdown-link>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <x-dropdown-link :href="route('logout')"
+                                <x-dropdown-link href="#"
                                         onclick="event.preventDefault(); this.closest('form').submit();">
                                     ログアウト
                                 </x-dropdown-link>
@@ -119,10 +119,11 @@
                 <x-responsive-nav-link :href="route('profile.edit')">プロフィール設定</x-responsive-nav-link>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <x-responsive-nav-link :href="route('logout')"
+                    <x-responsive-nav-link href="#"
                             onclick="event.preventDefault(); this.closest('form').submit();">
                         ログアウト
                     </x-responsive-nav-link>
+
                 </form>
             </div>
         </div>

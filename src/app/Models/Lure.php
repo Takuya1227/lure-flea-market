@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\Favorite;
 
 class Lure extends Model
@@ -17,18 +18,19 @@ class Lure extends Model
         'category', 'lure_type', 'condition',
         'is_handmade', 'is_discontinued', 'is_limited',
         'color_id', 'color_name_custom', 'size_mm', 'weight_g',
-        'material', 'action', 'buoyancy', 'range',
+        'material', 'action', 'buoyancy', 'ranges', 'video_path',
         'hook_size', 'hook_condition', 'accessories',
         'category_attributes',
         'description', 'price',
         'shipping_cost_type', 'shipping_method', 'shipping_days', 'shipping_prefecture',
-        'status',
+        'status', 'sold_at',
     ];
 
     protected function casts(): array
     {
         return [
             'category_attributes' => 'array',
+            'ranges'              => 'array',
             'is_handmade'         => 'boolean',
             'is_discontinued'     => 'boolean',
             'is_limited'          => 'boolean',
@@ -61,6 +63,11 @@ class Lure extends Model
     public function favorites(): HasMany
     {
         return $this->hasMany(Favorite::class);
+    }
+
+    public function transaction(): HasOne
+    {
+        return $this->hasOne(Transaction::class);
     }
 
     // ---- スコープ ----

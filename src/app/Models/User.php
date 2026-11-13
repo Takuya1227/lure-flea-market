@@ -7,7 +7,10 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\BankAccount;
 use App\Models\Lure;
+use App\Models\Transaction;
+use App\Models\WithdrawalRequest;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -45,6 +48,26 @@ class User extends Authenticatable implements MustVerifyEmail
     public function shippingAddresses(): HasMany
     {
         return $this->hasMany(ShippingAddress::class);
+    }
+
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(BankAccount::class);
+    }
+
+    public function withdrawalRequests(): HasMany
+    {
+        return $this->hasMany(WithdrawalRequest::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'buyer_id');
+    }
+
+    public function sales(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'seller_id');
     }
 
     public function lures(): HasMany

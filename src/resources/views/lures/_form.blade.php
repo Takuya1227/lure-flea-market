@@ -209,7 +209,7 @@
             <input type="text" name="color_name_custom"
                    placeholder="カラー名を入力"
                    value="{{ old('color_name_custom', $lure->color_name_custom ?? '') }}"
-                   x-show="colorId === 'other' || colorId === ''"
+                   x-show="colorId === 'other'"
                    class="mt-2 w-full border-gray-300 rounded-md text-sm">
         </div>
         <div>
@@ -239,8 +239,8 @@
         </div>
     </div>
 
-    {{-- アクション・浮力・レンジ --}}
-    <div class="grid grid-cols-3 gap-4">
+    {{-- アクション・浮力 --}}
+    <div class="grid grid-cols-2 gap-4">
         <div>
             <label class="block text-sm text-gray-600 mb-1">アクション</label>
             <select name="action" class="w-full border-gray-300 rounded-md text-sm">
@@ -263,14 +263,21 @@
                 @endforeach
             </select>
         </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">レンジ</label>
-            <select name="range" class="w-full border-gray-300 rounded-md text-sm">
-                <option value="">--</option>
-                @foreach (['surface' => '表層', 'shallow' => 'シャロー', 'middle' => '中層', 'deep' => 'ディープ', 'bottom' => 'ボトム'] as $val => $label)
-                    <option value="{{ $val }}" {{ old('range', $lure->range ?? '') === $val ? 'selected' : '' }}>{{ $label }}</option>
-                @endforeach
-            </select>
+    </div>
+
+    {{-- レンジ（複数選択） --}}
+    <div>
+        <label class="block text-sm text-gray-600 mb-2">レンジ（複数選択可）</label>
+        <div class="flex flex-wrap gap-3">
+            @php $selectedRanges = old('ranges', $lure->ranges ?? []); @endphp
+            @foreach (['surface' => '表層', 'shallow' => 'シャロー', 'middle' => '中層', 'deep' => 'ディープ', 'bottom' => 'ボトム'] as $val => $label)
+                <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                    <input type="checkbox" name="ranges[]" value="{{ $val }}"
+                           {{ in_array($val, (array)$selectedRanges) ? 'checked' : '' }}
+                           class="rounded border-gray-300 text-indigo-600">
+                    {{ $label }}
+                </label>
+            @endforeach
         </div>
     </div>
 
@@ -450,38 +457,127 @@
 {{-- ---- セクション8: 画像アップロード（編集画面では別セクションを使うため非表示） ---- --}}
 @if (!($editMode ?? false))
 <div class="bg-white shadow rounded-lg p-6 mb-6"
-     x-data="imageUpload()">
+     x-data="imageUpload({{ json_encode(old('temp_image_paths', [])) }})">
     <h3 class="text-sm font-medium text-gray-700 mb-3">
         商品画像 <span class="text-xs text-gray-400">（最大10枚・各5MB以下・JPEG/PNG/WebP）</span>
     </h3>
 
-    {{-- ドロップゾーン（ドラッグ&ドロップ対応） --}}
+    {{-- サイズエラー --}}
+    <div x-show="sizeError" x-cloak
+         class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600"
+         x-text="sizeError"></div>
+
+    {{-- アップロード中メッセージ --}}
+    <div x-show="hasUploading" x-cloak
+         class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+        画像をアップロード中です。完了までお待ちください...
+    </div>
+
+    {{-- ドロップゾーン --}}
     <div class="border-2 border-dashed rounded-lg p-6 text-center transition"
          :class="isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400'"
          @dragover.prevent="isDragging = true"
          @dragleave.prevent="isDragging = false"
          @drop.prevent="handleDrop($event)">
-        <label class="cursor-pointer block">
-            <input type="file" name="images[]" multiple accept="image/jpeg,image/png,image/webp"
-                   x-ref="fileInput" class="sr-only" @change="previewImages($event)">
+        <label class="cursor-pointer block" :class="images.length >= 10 ? 'opacity-40 pointer-events-none' : ''">
+            {{-- ファイル選択用（フォーム送信には使わない） --}}
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp"
+                   x-ref="fileInput" class="sr-only" @change="onFileChange($event)">
             <p class="text-sm text-gray-500">クリックして画像を選択</p>
             <p class="text-xs text-gray-400 mt-1">または画像をここにドラッグ＆ドロップ</p>
         </label>
     </div>
 
-    {{-- プレビュー --}}
-    <div class="mt-4 grid grid-cols-4 gap-3" x-show="previews.length > 0">
-        <template x-for="(src, i) in previews" :key="i">
+    {{-- プレビューグリッド --}}
+    <div class="mt-4 grid grid-cols-4 gap-3" x-show="images.length > 0">
+        <template x-for="(img, i) in images" :key="i">
             <div class="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                <img :src="src" alt="" class="w-full h-full object-cover">
-                <span x-text="i + 1"
+                <img :src="img.url" alt="" class="w-full h-full object-cover">
+
+                {{-- アップロード中スピナー --}}
+                <div x-show="img.uploading"
+                     class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <svg class="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                </div>
+
+                {{-- アップロードエラー --}}
+                <div x-show="img.error"
+                     class="absolute inset-0 bg-red-600 bg-opacity-80 flex items-center justify-center p-1">
+                    <span class="text-white text-xs text-center leading-tight" x-text="img.error"></span>
+                </div>
+
+                {{-- 枚数番号 --}}
+                <span x-show="!img.uploading && !img.error" x-text="i + 1"
                       class="absolute top-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1.5 py-0.5 rounded"></span>
+
+                {{-- 削除ボタン --}}
+                <button type="button" @click="removeImage(i)"
+                        class="absolute top-1 right-1 w-5 h-5 bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full flex items-center justify-center text-xs leading-none transition">
+                    ✕
+                </button>
+
+                {{-- 一時パスをフォームへ送信（アップロード成功済みのみ） --}}
+                <template x-if="img.path">
+                    <input type="hidden" name="temp_image_paths[]" :value="img.path">
+                </template>
             </div>
         </template>
     </div>
-    <p class="mt-2 text-xs text-gray-400" x-show="previews.length > 0" x-text="previews.length + '枚選択中'"></p>
+    <p class="mt-2 text-xs text-gray-400" x-show="images.length > 0"
+       x-text="images.length + '枚' + (hasUploading ? '（アップロード中...）' : '選択中')"></p>
 </div>
 @endif
+
+{{--
+    ---- セクション9: 動画アップロード（現在無効） ----
+    サーバーのストレージ容量を圧迫するリスクがあるため、一時的に非表示にしています。
+    将来的にS3等の外部ストレージに移行した際に有効化する予定です。
+    バックエンド（ルート・コントローラー・モデル・DB列）はすべて実装済みです。
+    有効化する際はこのコメントブロックを外すだけで動作します。
+    参照: /tasks/decisions.md「動画アップロード機能」
+
+<div class="bg-white shadow rounded-lg p-6 mb-6"
+     x-data="videoUpload('{{ old('temp_video_path', '') }}')">
+    <h3 class="text-sm font-medium text-gray-700 mb-1">
+        ルアーの動き（動画）<span class="text-xs text-gray-400 ml-1">任意・MP4/MOV/WebP・100MB以下</span>
+    </h3>
+    <p class="text-xs text-gray-400 mb-3">ルアーの動きがわかる動画を1本アップロードできます</p>
+
+    {{-- エラー --}}
+    <div x-show="uploadError" x-cloak
+         class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600"
+         x-text="uploadError"></div>
+
+    {{-- アップロード中 --}}
+    <div x-show="uploading" x-cloak
+         class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+        動画をアップロード中です...
+    </div>
+
+    {{-- 選択ボタン（動画未選択時）--}}
+    <div x-show="!videoPath && !uploading">
+        <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">
+            <input type="file" accept="video/mp4,video/quicktime,video/webm"
+                   x-ref="videoInput" class="sr-only" @change="onVideoChange($event)">
+            動画を選択する
+        </label>
+    </div>
+
+    {{-- プレビュー（アップロード完了後）--}}
+    <div x-show="videoPath && !uploading" x-cloak>
+        <video :src="videoUrl" controls class="w-full max-h-64 rounded-lg bg-black"></video>
+        <div class="mt-2 flex items-center gap-3">
+            <p class="text-xs text-gray-500">動画が選択されています</p>
+            <button type="button" @click="removeVideo()"
+                    class="text-xs text-red-500 hover:underline">削除</button>
+        </div>
+        <input type="hidden" name="temp_video_path" :value="videoPath">
+    </div>
+</div>
+--}}
 
 {{-- Alpine.js: フォームロジック --}}
 <script>
@@ -494,38 +590,143 @@ function lureForm(initialCategory) {
     };
 }
 
-function imageUpload() {
+function imageUpload(existingPaths) {
     return {
-        previews: [],
+        images: [],      // [{url, path, uploading, error}]
         isDragging: false,
-        allFiles: [], // 複数回の選択を蓄積するリスト
+        sizeError: '',
 
-        addFiles(newFiles) {
-            // 既存ファイルに追加して最大10枚まで保持
-            const combined = [...this.allFiles, ...Array.from(newFiles)];
-            this.allFiles = combined.slice(0, 10);
-
-            // file input に全ファイルをセット（サーバー送信対象）
-            const dt = new DataTransfer();
-            this.allFiles.forEach(f => dt.items.add(f));
-            this.$refs.fileInput.files = dt.files;
-
-            // プレビューを全ファイル分で再生成
-            this.previews = [];
-            this.allFiles.forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (e) => this.previews.push(e.target.result);
-                reader.readAsDataURL(file);
-            });
+        get hasUploading() {
+            return this.images.some(img => img.uploading);
         },
 
-        previewImages(event) {
+        init() {
+            // バリデーションエラー後のページリロード時に一時画像を復元
+            (existingPaths || []).forEach(path => {
+                this.images.push({ url: '/storage/' + path, path, uploading: false, error: null });
+            });
+
+            // アップロード中は送信をブロック
+            const form = this.$el.closest('form');
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    if (this.hasUploading) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                    }
+                }, true);
+            }
+        },
+
+        async addFiles(files) {
+            const maxSize = 5 * 1024 * 1024;
+            const oversized = [], valid = [];
+
+            Array.from(files).forEach(f => {
+                if (f.size > maxSize) oversized.push(f.name);
+                else valid.push(f);
+            });
+
+            this.sizeError = oversized.length
+                ? '5MB未満の画像を選択してください（超過: ' + oversized.join(', ') + '）'
+                : '';
+
+            const slots = 10 - this.images.length;
+            if (slots <= 0 || valid.length === 0) return;
+
+            const token = document.head.querySelector('meta[name="csrf-token"]').content;
+
+            for (const file of valid.slice(0, slots)) {
+                const idx = this.images.length;
+                this.images.push({ url: URL.createObjectURL(file), path: null, uploading: true, error: null });
+
+                const form = new FormData();
+                form.append('image', file);
+                form.append('_token', token);
+
+                try {
+                    const res = await fetch('{{ route("lures.images.temp") }}', { method: 'POST', body: form });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message || 'エラー');
+                    this.images[idx] = { ...this.images[idx], path: data.path, uploading: false };
+                } catch {
+                    this.images[idx] = { ...this.images[idx], error: 'アップロードに\n失敗しました', uploading: false };
+                }
+            }
+        },
+
+        removeImage(i) {
+            this.images.splice(i, 1);
+        },
+
+        onFileChange(event) {
             this.addFiles(event.target.files);
+            event.target.value = '';  // 同じファイルを再選択できるようにリセット
         },
 
         handleDrop(event) {
             this.isDragging = false;
             this.addFiles(event.dataTransfer.files);
+        },
+    };
+}
+
+function videoUpload(existingPath) {
+    return {
+        videoPath: existingPath || '',
+        videoUrl: existingPath ? '/storage/' + existingPath : '',
+        uploading: false,
+        uploadError: '',
+
+        init() {
+            const form = this.$el.closest('form');
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    if (this.uploading) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                    }
+                }, true);
+            }
+        },
+
+        async onVideoChange(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            event.target.value = '';
+
+            const maxSize = 100 * 1024 * 1024;
+            if (file.size > maxSize) {
+                this.uploadError = '動画は100MB以下にしてください（選択: ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）';
+                return;
+            }
+
+            this.uploadError = '';
+            this.uploading = true;
+            this.videoPath = '';
+            this.videoUrl = '';
+
+            const form = new FormData();
+            form.append('video', file);
+            form.append('_token', document.head.querySelector('meta[name="csrf-token"]').content);
+
+            try {
+                const res = await fetch('{{ route("lures.videos.temp") }}', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'エラー');
+                this.videoPath = data.path;
+                this.videoUrl = data.url;
+            } catch {
+                this.uploadError = '動画のアップロードに失敗しました。もう一度お試しください。';
+            } finally {
+                this.uploading = false;
+            }
+        },
+
+        removeVideo() {
+            this.videoPath = '';
+            this.videoUrl = '';
+            this.uploadError = '';
         },
     };
 }

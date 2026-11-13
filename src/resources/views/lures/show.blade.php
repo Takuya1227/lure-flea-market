@@ -19,6 +19,11 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if (session('error'))
+                <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                    {{ session('error') }}
+                </div>
+            @endif
 
             {{-- ステータスバナー（非公開の場合） --}}
             @if ($lure->status !== 'active')
@@ -144,10 +149,10 @@
                         @else
                             {{-- 購入ボタン（フェーズ5で実装） --}}
                             @auth
-                                <button disabled
-                                        class="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl opacity-60 cursor-not-allowed text-sm">
-                                    購入する（近日公開）
-                                </button>
+                                <a href="{{ route('transactions.create', ['lure_id' => $lure->id]) }}"
+                                   class="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition text-sm text-center">
+                                    購入する
+                                </a>
                             @else
                                 <a href="{{ route('login') }}"
                                    class="flex-1 py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition text-sm text-center">
@@ -196,6 +201,15 @@
                 @endif
             </div>
 
+            {{-- ===== 動画 ===== --}}
+            @if ($lure->video_path && Storage::disk('public')->exists($lure->video_path))
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="font-medium text-gray-900 mb-3">ルアーの動き（動画）</h3>
+                    <video src="{{ Storage::disk('public')->url($lure->video_path) }}"
+                           controls class="w-full rounded-lg bg-black max-h-80"></video>
+                </div>
+            @endif
+
             {{-- ===== スペック詳細 ===== --}}
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="font-medium text-gray-900 mb-4">商品詳細</h3>
@@ -223,6 +237,15 @@
                     @if ($lure->buoyancy)
                         <dt class="text-gray-500">浮力</dt>
                         <dd class="text-gray-800">{{ $lure->buoyancy }}</dd>
+                    @endif
+                    @if ($lure->ranges && count($lure->ranges) > 0)
+                        <dt class="text-gray-500">レンジ</dt>
+                        <dd class="text-gray-800">
+                            @php
+                                $rangeLabels = ['surface'=>'表層','shallow'=>'シャロー','middle'=>'中層','deep'=>'ディープ','bottom'=>'ボトム'];
+                            @endphp
+                            {{ implode('・', array_map(fn($r) => $rangeLabels[$r] ?? $r, $lure->ranges)) }}
+                        </dd>
                     @endif
                     @if ($lure->hook_size)
                         <dt class="text-gray-500">フックサイズ</dt>

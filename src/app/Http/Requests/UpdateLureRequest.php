@@ -30,6 +30,9 @@ class UpdateLureRequest extends FormRequest
                 'shipping_cost_type' => ['nullable', 'in:included,cash_on_delivery'],
                 'shipping_days'      => ['nullable', 'in:1_2_days,3_7_days,over_7_days'],
                 'shipping_prefecture'=> ['nullable', 'string', 'max:10'],
+                'ranges'             => ['nullable', 'array'],
+                'ranges.*'           => ['in:surface,shallow,middle,deep,bottom'],
+                'temp_video_path'    => ['nullable', 'string'],
             ];
         }
 
@@ -51,7 +54,9 @@ class UpdateLureRequest extends FormRequest
             'material'            => ['nullable', 'in:plastic,wood,metal,rubber,other'],
             'action'              => ['nullable', 'in:wobbling,rolling,wobble_and_roll,slide,i_shaped,no_action,other'],
             'buoyancy'            => ['nullable', 'in:floating,suspending,sinking'],
-            'range'               => ['nullable', 'in:surface,shallow,middle,deep,bottom'],
+            'ranges'              => ['nullable', 'array'],
+            'ranges.*'            => ['in:surface,shallow,middle,deep,bottom'],
+            'temp_video_path'     => ['nullable', 'string'],
             'hook_size'           => ['nullable', 'string', 'max:10'],
             'hook_condition'      => ['nullable', 'in:new,replaced,used,rusty'],
             'accessories'         => ['nullable', 'string', 'max:255'],
